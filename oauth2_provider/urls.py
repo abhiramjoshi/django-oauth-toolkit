@@ -15,12 +15,12 @@ base_urlpatterns = [
     path("device/", views.DeviceUserCodeView.as_view(), name="device"),
     path(
         "device-confirm/<slug:client_id>/<slug:user_code>",
-        views.DeviceConfirmView.as_view(),
+        views.DeviceConfirmViewOIDC.as_view(),
         name="device-confirm",
     ),
     path(
         "device-grant-status/<slug:client_id>/<slug:user_code>",
-        views.DeviceGrantStatusView.as_view(),
+        views.DeviceGrantStatusViewOICD.as_view(),
         name="device-grant-status",
     ),
 ]

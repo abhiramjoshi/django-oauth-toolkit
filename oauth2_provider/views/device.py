@@ -1,3 +1,4 @@
+from datetime import datetime
 import json
 
 from django import forms, http
@@ -14,6 +15,7 @@ from oauth2_provider.compat import login_not_required
 from oauth2_provider.models import (
     DeviceCodeResponse,
     DeviceGrant,
+    DeviceGrantOIDC,
     DeviceRequest,
     create_device_grant,
     get_device_grant_model,
@@ -32,7 +34,11 @@ class DeviceAuthorizationView(OAuthLibMixin, View):
         if status != 200:
             return http.JsonResponse(data=json.loads(response), status=status, headers=headers)
 
-        device_request = DeviceRequest(client_id=request.POST["client_id"], scope=request.POST.get("scope"))
+        device_request = DeviceRequest(
+            client_id=request.POST["client_id"],
+            nonce=request.POST.get("nonce"),
+            scope=request.POST.get("scope"),
+        )
         device_response = DeviceCodeResponse(**response)
         create_device_grant(device_request, device_response)
 
@@ -183,6 +189,38 @@ class DeviceConfirmView(LoginRequiredMixin, FormView):
             return http.HttpResponseBadRequest()
 
 
+class DeviceConfirmViewOIDC(DeviceConfirmView):
+    """
+    The view where the user approves or denies a device using OIDC.
+    """
+
+    def get_object(self):
+        """
+        Returns the DeviceGrantOICD object in the AUTHORIZATION_PENDING state identified
+        by the slugs client_id and user_code. Raises Http404 if not found.
+        """
+        client_id, user_code = self.kwargs.get("client_id"), self.kwargs.get("user_code")
+        return get_object_or_404(
+            DeviceGrantOIDC,
+            client_id=client_id,
+            user_code=user_code,
+            status=DeviceGrantOIDC.AUTHORIZATION_PENDING,
+        )
+
+    def form_valid(self, form):
+        device = self.get_object()
+        action = form.cleaned_data["action"]
+
+        if action == "accept":
+            device.auth_time = datetime.now().timestamp()
+            device.save(update_fields=["auth_time"])
+            return super().form_valid(form)
+        elif action == "deny":
+            return super().form_valid(form)
+        else:
+            return http.HttpResponseBadRequest()
+
+
 class DeviceGrantStatusView(LoginRequiredMixin, DetailView):
     """
     The view to display the status of a DeviceGrant.
@@ -194,3 +232,16 @@ class DeviceGrantStatusView(LoginRequiredMixin, DetailView):
     def get_object(self):
         client_id, user_code = self.kwargs.get("client_id"), self.kwargs.get("user_code")
         return get_object_or_404(DeviceGrant, client_id=client_id, user_code=user_code)
+
+
+class DeviceGrantStatusViewOICD(LoginRequiredMixin, DetailView):
+    """
+    The view to display the status of a DeviceGrant.
+    """
+
+    model = DeviceGrantOIDC
+    template_name = "oauth2_provider/device/device_grant_status.html"
+
+    def get_object(self):
+        client_id, user_code = self.kwargs.get("client_id"), self.kwargs.get("user_code")
+        return get_object_or_404(DeviceGrantOIDC, client_id=client_id, user_code=user_code)

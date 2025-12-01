@@ -15,13 +15,11 @@ from django.views.decorators.debug import sensitive_post_parameters
 from django.views.generic import FormView, View
 from oauthlib.oauth2.rfc8628 import errors as rfc8628_errors
 
-from oauth2_provider.models import DeviceGrant
-
 from ..compat import login_not_required
 from ..exceptions import OAuthToolkitError
 from ..forms import AllowForm
 from ..http import OAuth2ResponseRedirect
-from ..models import get_access_token_model, get_application_model
+from ..models import get_access_token_model, get_application_model, get_device_grant_model
 from ..scopes import get_scopes_backend
 from ..settings import oauth2_settings
 from ..signals import app_authorized
@@ -317,6 +315,7 @@ class TokenView(OAuthLibMixin, View):
     def device_flow_token_response(
         self, request: http.HttpRequest, device_code: str, *args, **kwargs
     ) -> http.HttpResponse:
+        DeviceGrant = get_device_grant_model()
         try:
             device = DeviceGrant.objects.get(device_code=device_code)
         except DeviceGrant.DoesNotExist:
@@ -359,6 +358,9 @@ class TokenView(OAuthLibMixin, View):
                 content_type="application/json",
             )
 
+        request.nonce = device.nonce
+        request.scopes = ["openid"]
+        request.user = device.user_id
         url, headers, body, status = self.create_token_response(request)
         response = http.JsonResponse(data=json.loads(body), status=status)
 

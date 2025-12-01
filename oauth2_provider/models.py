@@ -718,11 +718,20 @@ class DeviceGrant(AbstractDeviceGrant):
         swappable = "OAUTH2_PROVIDER_DEVICE_GRANT_MODEL"
 
 
+class DeviceGrantOIDC(AbstractDeviceGrant):
+    auth_time = models.BigIntegerField(blank=True, null=True)
+    nonce = models.CharField(max_length=255, blank=True, default="")
+    class Meta(AbstractDeviceGrant.Meta):
+        swappable = "OAUTH2_PROVIDER_DEVICE_GRANT_MODEL"
+        app_label = "oauth2_provider"
+
+
 @dataclass
 class DeviceRequest:
     # https://datatracker.ietf.org/doc/html/rfc8628#section-3.1
     # scope is optional
     client_id: str
+    nonce: str
     scope: Optional[str] = None
 
 
@@ -738,12 +747,13 @@ class DeviceCodeResponse:
 
 def create_device_grant(device_request: DeviceRequest, device_response: DeviceCodeResponse) -> DeviceGrant:
     now = datetime.now(tz=dt_timezone.utc)
-
+    DeviceGrant = get_device_grant_model()
     return DeviceGrant.objects.create(
         client_id=device_request.client_id,
         device_code=device_response.device_code,
         user_code=device_response.user_code,
         scope=device_request.scope,
+        nonce=device_request.nonce,
         expires=now + timedelta(seconds=device_response.expires_in),
     )
 
