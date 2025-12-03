@@ -100,7 +100,8 @@ class AuthorizationView(BaseAuthorizationView, FormView):
 
     def get_initial(self):
         # TODO: move this scopes conversion from and to string into a utils function
-        scopes = self.oauth2_data.get("scope", self.oauth2_data.get("scopes", []))
+        scopes = self.oauth2_data.get(
+            "scope", self.oauth2_data.get("scopes", []))
         initial_data = {
             "redirect_uri": self.oauth2_data.get("redirect_uri", None),
             "scope": " ".join(scopes),
@@ -124,9 +125,11 @@ class AuthorizationView(BaseAuthorizationView, FormView):
             "state": form.cleaned_data.get("state", None),
         }
         if form.cleaned_data.get("code_challenge", False):
-            credentials["code_challenge"] = form.cleaned_data.get("code_challenge")
+            credentials["code_challenge"] = form.cleaned_data.get(
+                "code_challenge")
         if form.cleaned_data.get("code_challenge_method", False):
-            credentials["code_challenge_method"] = form.cleaned_data.get("code_challenge_method")
+            credentials["code_challenge_method"] = form.cleaned_data.get(
+                "code_challenge_method")
         if form.cleaned_data.get("nonce", False):
             credentials["nonce"] = form.cleaned_data.get("nonce")
         if form.cleaned_data.get("claims", False):
@@ -163,7 +166,8 @@ class AuthorizationView(BaseAuthorizationView, FormView):
         # at this point we know an Application instance with such client_id exists in the database
 
         # TODO: Cache this!
-        application = get_application_model().objects.get(client_id=credentials["client_id"])
+        application = get_application_model().objects.get(
+            client_id=credentials["client_id"])
 
         kwargs["application"] = application
         kwargs["client_id"] = credentials["client_id"]
@@ -186,7 +190,8 @@ class AuthorizationView(BaseAuthorizationView, FormView):
 
         # Check to see if the user has already granted access and return
         # a successful response depending on "approval_prompt" url parameter
-        require_approval = request.GET.get("approval_prompt", oauth2_settings.REQUEST_APPROVAL_PROMPT)
+        require_approval = request.GET.get(
+            "approval_prompt", oauth2_settings.REQUEST_APPROVAL_PROMPT)
 
         if "ui_locales" in credentials and isinstance(credentials["ui_locales"], list):
             # Make sure ui_locales a space separated string for oauthlib to handle it correctly.
@@ -207,7 +212,8 @@ class AuthorizationView(BaseAuthorizationView, FormView):
                 tokens = (
                     get_access_token_model()
                     .objects.filter(
-                        user=request.user, application=kwargs["application"], expires__gt=timezone.now()
+                        user=request.user, application=kwargs["application"], expires__gt=timezone.now(
+                        )
                     )
                     .all()
                 )
@@ -276,7 +282,8 @@ class AuthorizationView(BaseAuthorizationView, FormView):
                 response_parameters["state"] = state
 
             separator = "&" if "?" in redirect_uri else "?"
-            redirect_to = redirect_uri + separator + urlencode(response_parameters)
+            redirect_to = redirect_uri + separator + \
+                urlencode(response_parameters)
             return self.redirect(redirect_to, application=None)
         else:
             return super().handle_no_permission()
@@ -303,7 +310,8 @@ class TokenView(OAuthLibMixin, View):
         if status == 200:
             access_token = json.loads(body).get("access_token")
             if access_token is not None:
-                token_checksum = hashlib.sha256(access_token.encode("utf-8")).hexdigest()
+                token_checksum = hashlib.sha256(
+                    access_token.encode("utf-8")).hexdigest()
                 token = get_access_token_model().objects.get(token_checksum=token_checksum)
                 app_authorized.send(sender=self, request=request, token=token)
         response = HttpResponse(content=body, status=status)
@@ -362,7 +370,9 @@ class TokenView(OAuthLibMixin, View):
         request.scopes = ["openid"]
         request.user = device.user_id
         url, headers, body, status = self.create_token_response(request)
-        response = http.JsonResponse(data=json.loads(body), status=status)
+        data = json.loads(body)
+        data["nonce"] = device.nonce
+        response = http.JsonResponse(data=data, status=status)
 
         if status != 200:
             return response
